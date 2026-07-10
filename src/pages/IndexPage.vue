@@ -86,17 +86,6 @@
             class="filter-field month-field"
             popup-content-class="filter-popup"
           />
-
-          <q-btn
-            unelevated
-            no-caps
-            icon="search"
-            label="ค้นหา"
-            color="primary"
-            :loading="loading"
-            class="filter-search-btn"
-            @click="fetchAll"
-          />
         </div>
       </div>
 
@@ -118,7 +107,11 @@
             </div>
           </div>
           <div class="legend-inline">
-            <span class="legend-inline__dot" style="background: #f2845c"></span>
+            <!-- <span class="legend-inline__dot" style="background: #f2845c"></span> -->
+            <span
+              class="legend-inline__line"
+              style="background: #e86d3a"
+            ></span>
             <span class="legend-inline__text">อัตราสำรองเวชภัณฑ์</span>
           </div>
         </div>
@@ -220,8 +213,7 @@
             <div class="panel__canvas panel__canvas--doughnut">
               <canvas
                 :ref="
-                  (el) =>
-                    setTopTenCanvas(cfg.key, el as HTMLCanvasElement | null)
+                  el => setTopTenCanvas(cfg.key, el as HTMLCanvasElement | null)
                 "
               ></canvas>
             </div>
@@ -251,7 +243,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, type Ref } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  watch,
+  type Ref
+} from "vue";
 import { api } from "@/boot/axios";
 import {
   Chart,
@@ -264,6 +264,10 @@ import {
   Title,
   DoughnutController,
   ArcElement,
+  LineController,
+  LineElement,
+  PointElement,
+  Filler
 } from "chart.js";
 
 Chart.register(
@@ -276,6 +280,10 @@ Chart.register(
   Title,
   DoughnutController,
   ArcElement,
+  LineController,
+  LineElement,
+  PointElement,
+  Filler
 );
 
 /* ════════════════════════════════════════════════
@@ -338,7 +346,7 @@ const THAI_MONTHS_SHORT = [
   "ก.ย.",
   "ต.ค.",
   "พ.ย.",
-  "ธ.ค.",
+  "ธ.ค."
 ] as const;
 
 const THAI_MONTHS_FULL = [
@@ -354,7 +362,7 @@ const THAI_MONTHS_FULL = [
   "กันยายน",
   "ตุลาคม",
   "พฤศจิกายน",
-  "ธันวาคม",
+  "ธันวาคม"
 ] as const;
 
 const FISCAL_MONTH_ORDER = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
@@ -371,7 +379,7 @@ const MONTH_OPTIONS = [
   { label: "มิถุนายน", value: 6 },
   { label: "กรกฎาคม", value: 7 },
   { label: "สิงหาคม", value: 8 },
-  { label: "กันยายน", value: 9 },
+  { label: "กันยายน", value: 9 }
 ] as const;
 
 const PALETTE = {
@@ -387,7 +395,7 @@ const PALETTE = {
     "#FFB98A",
     "#FFDCC4",
     "#B83E15",
-    "#A33510",
+    "#A33510"
   ],
   teal: [
     "#0D9488",
@@ -399,7 +407,7 @@ const PALETTE = {
     "#115E59",
     "#0EA5A0",
     "#3BC9C0",
-    "#7EE0D8",
+    "#7EE0D8"
   ],
   coral: [
     "#E86D3A",
@@ -411,13 +419,13 @@ const PALETTE = {
     "#C94C1E",
     "#FF8F5A",
     "#FFAB7E",
-    "#FFC9A5",
-  ],
+    "#FFC9A5"
+  ]
 } as const;
 
 const CHART_FONT = {
   family: "'Sarabun','Inter',sans-serif",
-  size: 12,
+  size: 12
 } as const;
 const GRID_COLOR = "rgba(0,0,0,0.04)";
 const TICK_COLOR = "rgba(0,0,0,0.5)";
@@ -431,7 +439,7 @@ const START_YEAR = 2020;
 function formatCurrency(val: number): string {
   return (val ?? 0).toLocaleString("th-TH", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 0
   });
 }
 
@@ -456,7 +464,7 @@ function isMobile(): boolean {
 function buildLegendItems(
   labels: string[],
   values: number[],
-  palette: readonly string[],
+  palette: readonly string[]
 ): LegendItem[] {
   const total = values.reduce((a, b) => a + b, 0);
   // return labels.map((label, i) => ({
@@ -469,7 +477,7 @@ function buildLegendItems(
     label,
     color: palette[i % palette.length] ?? "#999999",
     pct: total > 0 ? (((values[i] ?? 0) / total) * 100).toFixed(1) : "0.0",
-    value: values[i] ?? 0,
+    value: values[i] ?? 0
   }));
 }
 
@@ -487,7 +495,7 @@ function toBarItems(names: string[], values: number[]): BarItem[] {
     name,
     value: values[i] ?? 0,
     pct: ((values[i] ?? 0) / max) * 100,
-    sharePct: total > 0 ? ((values[i] ?? 0) / total) * 100 : 0,
+    sharePct: total > 0 ? ((values[i] ?? 0) / total) * 100 : 0
   }));
 }
 
@@ -497,7 +505,7 @@ function updateTimestamp(): void {
     minute: "2-digit",
     day: "2-digit",
     month: "short",
-    year: "numeric",
+    year: "numeric"
   });
 }
 
@@ -572,7 +580,7 @@ const summaryCards = computed(() => [
     display: (totalSKU.value ?? 0).toLocaleString(),
     unit: "รายการ",
     color: "#4361EE",
-    iconBg: "rgba(67,97,238,0.12)",
+    iconBg: "rgba(67,97,238,0.12)"
   },
   {
     key: "value",
@@ -581,8 +589,8 @@ const summaryCards = computed(() => [
     display: formatCurrency(stockValue.value),
     unit: "บาท",
     color: "#7B2FF7",
-    iconBg: "rgba(123,47,247,0.12)",
-  },
+    iconBg: "rgba(123,47,247,0.12)"
+  }
 ]);
 
 /* ════════════════════════════════════════════════
@@ -602,7 +610,7 @@ const topTenConfigs: TopTenPanelConfig[] = [
     palette: PALETTE.teal,
     items: topStockItems,
     legend: topStockPieLegend,
-    useMonth: true,
+    useMonth: true
   },
   {
     key: "transout",
@@ -616,8 +624,8 @@ const topTenConfigs: TopTenPanelConfig[] = [
     palette: PALETTE.coral,
     items: topTransOutItems,
     legend: topTransOutPieLegend,
-    useMonth: false,
-  },
+    useMonth: false
+  }
 ];
 
 // function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
@@ -625,14 +633,19 @@ const topTenConfigs: TopTenPanelConfig[] = [
 //   const month = selectedMonth.value ? THAI_MONTHS_FULL[selectedMonth.value] : THAI_MONTHS_FULL[currentMonth];
 //   return `${month} · ปีงบ ${buddhistFiscalYear.value}`;
 // }
-
 function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
   if (selectedMonth.value) {
     return `${THAI_MONTHS_FULL[selectedMonth.value]} · ปีงบ ${buddhistFiscalYear.value}`;
   }
-  const fallback = cfg.useMonth ? THAI_MONTHS_FULL[currentMonth] : "ทุกเดือน";
-  return `${fallback} · ปีงบ ${buddhistFiscalYear.value}`;
+  return `ทุกเดือน · ปีงบ ${buddhistFiscalYear.value}`;
 }
+// function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
+//   if (selectedMonth.value) {
+//     return `${THAI_MONTHS_FULL[selectedMonth.value]} · ปีงบ ${buddhistFiscalYear.value}`;
+//   }
+//   const fallback = cfg.useMonth ? THAI_MONTHS_FULL[currentMonth] : "ทุกเดือน";
+//   return `${fallback} · ปีงบ ${buddhistFiscalYear.value}`;
+// }
 
 /* ════════════════════════════════════════════════
    Fiscal year options
@@ -647,9 +660,9 @@ const fiscalYearOptions = Array.from(
     const star = y === currentFiscalYear ? " ★" : "";
     return {
       label: `พ.ศ. ${beFiscal} (ต.ค. ${beStart} – ก.ย. ${beFiscal})${star}`,
-      value: y,
+      value: y
     };
-  },
+  }
 );
 
 const filteredFiscalYearOptions = ref(fiscalYearOptions);
@@ -658,7 +671,7 @@ function filterFiscalYear(val: string, update: (fn: () => void) => void): void {
   update(() => {
     const needle = val?.trim().toLowerCase();
     filteredFiscalYearOptions.value = needle
-      ? fiscalYearOptions.filter((o) => o.label.toLowerCase().includes(needle))
+      ? fiscalYearOptions.filter(o => o.label.toLowerCase().includes(needle))
       : fiscalYearOptions;
   });
 }
@@ -675,7 +688,7 @@ async function fetchAll(): Promise<void> {
       fetchTotalSKU(),
       fetchTotalStockValue(),
       fetchMonthlyStockValue(),
-      ...topTenConfigs.map(fetchTopTen),
+      ...topTenConfigs.map(fetchTopTen)
     ]);
     updateTimestamp();
   } finally {
@@ -686,7 +699,7 @@ async function fetchAll(): Promise<void> {
 async function fetchTotalSKU(): Promise<void> {
   try {
     const { data } = await api.get<{ total_of_SKU?: number }>(
-      "/dashboard/totalSKU",
+      "/dashboard/totalSKU"
     );
     totalSKU.value = data?.total_of_SKU ?? 0;
   } catch (e) {
@@ -697,7 +710,7 @@ async function fetchTotalSKU(): Promise<void> {
 async function fetchTotalStockValue(): Promise<void> {
   try {
     const { data } = await api.get<{ total_stock_value?: number }>(
-      "/dashboard/totalStockValue",
+      "/dashboard/totalStockValue"
     );
     stockValue.value = data?.total_stock_value ?? 0;
   } catch (e) {
@@ -709,16 +722,16 @@ async function fetchMonthlyStockValue(): Promise<void> {
   try {
     const { data } = await api.get<{ months?: MonthlyRecord[] }>(
       "/dashboard/MonthlyStockValue",
-      { params: { financialYear: fiscalYear.value } },
+      { params: { financialYear: fiscalYear.value } }
     );
 
     const months = data?.months ?? [];
     // const labels = months.map((m) => THAI_MONTHS_SHORT[m.month]);
     const labels = months.map(
-      (m) => THAI_MONTHS_SHORT[m.month] ?? String(m.month),
+      m => THAI_MONTHS_SHORT[m.month] ?? String(m.month)
     );
-    const values = months.map((m) => m.medSupply);
-    const monthIndices = months.map((m) => m.month);
+    const values = months.map(m => m.medSupply);
+    const monthIndices = months.map(m => m.month);
 
     await nextTick();
 
@@ -729,7 +742,7 @@ async function fetchMonthlyStockValue(): Promise<void> {
       monthlyPieRef.value,
       labels,
       values,
-      PALETTE.orange,
+      PALETTE.orange
     );
   } catch (e) {
     console.error("[Dashboard] fetchMonthlyStockValue:", e);
@@ -745,8 +758,8 @@ async function fetchTopTen(cfg: TopTenPanelConfig): Promise<void> {
 
     const { data } = await api.get<TopTenRecord[]>(cfg.endpoint, { params });
     const items = Array.isArray(data) ? data : [];
-    const labels = items.map((d) => d.name);
-    const values = items.map((d) => d.total);
+    const labels = items.map(d => d.name);
+    const values = items.map(d => d.total);
 
     cfg.items.value = toBarItems(labels, values);
     cfg.legend.value = buildLegendItems(labels, values, cfg.palette);
@@ -773,7 +786,7 @@ function baseTooltipStyle(): Record<string, unknown> {
     bodyFont: { ...CHART_FONT, size: 13 },
     padding: { top: 12, bottom: 12, left: 16, right: 16 },
     cornerRadius: 14,
-    titleMarginBottom: 8,
+    titleMarginBottom: 8
   };
 }
 
@@ -781,14 +794,14 @@ type BarState = "normal" | "hovered";
 
 const BAR_GRADIENT_STOPS: Record<BarState, [string, string]> = {
   hovered: ["rgba(220,80,60,0.85)", "rgba(200,55,35,1)"],
-  normal: ["rgba(251,176,144,0.75)", "rgba(232,109,58,1.0)"],
+  normal: ["rgba(251,176,144,0.75)", "rgba(232,109,58,1.0)"]
 };
 
 function makeBarGradient(
   ctx2d: CanvasRenderingContext2D,
   bottom: number,
   top: number,
-  state: BarState,
+  state: BarState
 ): CanvasGradient {
   const g = ctx2d.createLinearGradient(0, bottom, 0, top);
   const [s0, s1] = BAR_GRADIENT_STOPS[state];
@@ -796,50 +809,46 @@ function makeBarGradient(
   g.addColorStop(1, s1);
   return g;
 }
-
 function renderMonthlyBarChart(
   labels: string[],
   values: number[],
-  monthIndices: number[],
+  monthIndices: number[]
 ): void {
   destroyChart("monthly");
   if (!monthlyChartRef.value) return;
 
   const mobile = isMobile();
+  const ctx2d = monthlyChartRef.value.getContext("2d")!;
+
+  // Gradient fill ใต้เส้น
+  const gradientFill = ctx2d.createLinearGradient(0, 0, 0, 400);
+  gradientFill.addColorStop(0, "rgba(232, 109, 58, 0.35)");
+  gradientFill.addColorStop(0.6, "rgba(232, 109, 58, 0.08)");
+  gradientFill.addColorStop(1, "rgba(232, 109, 58, 0)");
 
   const chart = new Chart(monthlyChartRef.value, {
-    type: "bar",
+    type: "line",
     data: {
       labels,
       datasets: [
         {
           label: "อัตราสำรองเวชภัณฑ์",
           data: values,
-          backgroundColor(ctx) {
-            const chartInstance = ctx.chart;
-            const { ctx: canvasCtx, chartArea } = chartInstance;
-            if (!chartArea) return "rgba(232,109,58,0.8)";
-
-            const active = chartInstance.getActiveElements();
-            // const isHovered = active.length > 0 && active[0].index === ctx.dataIndex;
-            const isHovered =
-              active.length > 0 && active[0]?.index === ctx.dataIndex;
-            const state: BarState = isHovered ? "hovered" : "normal";
-
-            return makeBarGradient(
-              canvasCtx,
-              chartArea.bottom,
-              chartArea.top,
-              state,
-            );
-          },
-          borderWidth: 0,
-          borderRadius: mobile ? 4 : 8,
-          borderSkipped: false,
-          barPercentage: 0.55,
-          categoryPercentage: 0.65,
-        },
-      ],
+          borderColor: "#E86D3A",
+          borderWidth: 3,
+          backgroundColor: gradientFill,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: "#fff",
+          pointBorderColor: "#E86D3A",
+          pointBorderWidth: 2.5,
+          pointRadius: mobile ? 4 : 6,
+          pointHoverRadius: mobile ? 6 : 9,
+          pointHoverBackgroundColor: "#E86D3A",
+          pointHoverBorderColor: "#fff",
+          pointHoverBorderWidth: 3
+        }
+      ]
     },
     options: {
       responsive: true,
@@ -855,23 +864,6 @@ function renderMonthlyBarChart(
           displayColors: false,
           caretSize: 7,
           caretPadding: 8,
-          // callbacks: {
-          //   title(items) {
-          //     const idx = items[0].dataIndex;
-          //     const monthIdx = monthIndices[idx] ?? FISCAL_MONTH_ORDER[idx] ?? (idx + 1);
-          //     const yr = monthIdx >= 10 ? fiscalYear.value - 1 : fiscalYear.value;
-          //     return `${THAI_MONTHS_FULL[monthIdx]} พ.ศ. ${yr + 543}`;
-          //   },
-          //   label(ctx) {
-          //     return `มูลค่า: ${ctx.parsed.y.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บาท`;
-          //   },
-          //   afterLabel(ctx) {
-          //     const dataset = ctx.dataset.data as number[];
-          //     const dataTotal = dataset.reduce((a, b) => a + (Number(b) || 0), 0);
-          //     const pct = dataTotal > 0 ? ((ctx.parsed.y / dataTotal) * 100).toFixed(1) : '0.0';
-          //     return `สัดส่วน: ${pct}% ของทั้งปี`;
-          //   },
-          // },
           callbacks: {
             title(items) {
               const idx = items[0]?.dataIndex ?? 0;
@@ -888,16 +880,16 @@ function renderMonthlyBarChart(
               const dataset = ctx.dataset.data as number[];
               const dataTotal = dataset.reduce(
                 (a, b) => a + (Number(b) || 0),
-                0,
+                0
               );
               const pct =
                 dataTotal > 0
                   ? (((ctx.parsed.y ?? 0) / dataTotal) * 100).toFixed(1)
                   : "0.0";
               return `สัดส่วน: ${pct}% ของทั้งปี`;
-            },
-          },
-        },
+            }
+          }
+        }
       },
       scales: {
         x: {
@@ -906,8 +898,8 @@ function renderMonthlyBarChart(
           ticks: {
             color: TICK_COLOR,
             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
-            maxRotation: mobile ? 45 : 0,
-          },
+            maxRotation: mobile ? 45 : 0
+          }
         },
         y: {
           beginAtZero: true,
@@ -917,29 +909,158 @@ function renderMonthlyBarChart(
             color: TICK_COLOR,
             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
             padding: 8,
-            callback: (v) => formatAxisValue(Number(v)),
-          },
-        },
-      },
-    },
+            callback: v => formatAxisValue(Number(v))
+          }
+        }
+      }
+    }
   });
 
   charts.set("monthly", chart);
 }
+// function renderMonthlyBarChart(
+//   labels: string[],
+//   values: number[],
+//   monthIndices: number[],
+// ): void {
+//   destroyChart("monthly");
+//   if (!monthlyChartRef.value) return;
+
+//   const mobile = isMobile();
+
+//   const chart = new Chart(monthlyChartRef.value, {
+//     type: "bar",
+//     data: {
+//       labels,
+//       datasets: [
+//         {
+//           label: "อัตราสำรองเวชภัณฑ์",
+//           data: values,
+//           backgroundColor(ctx) {
+//             const chartInstance = ctx.chart;
+//             const { ctx: canvasCtx, chartArea } = chartInstance;
+//             if (!chartArea) return "rgba(232,109,58,0.8)";
+
+//             const active = chartInstance.getActiveElements();
+//             // const isHovered = active.length > 0 && active[0].index === ctx.dataIndex;
+//             const isHovered =
+//               active.length > 0 && active[0]?.index === ctx.dataIndex;
+//             const state: BarState = isHovered ? "hovered" : "normal";
+
+//             return makeBarGradient(
+//               canvasCtx,
+//               chartArea.bottom,
+//               chartArea.top,
+//               state,
+//             );
+//           },
+//           borderWidth: 0,
+//           borderRadius: mobile ? 4 : 8,
+//           borderSkipped: false,
+//           barPercentage: 0.55,
+//           categoryPercentage: 0.65,
+//         },
+//       ],
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       interaction: { mode: "index", intersect: false },
+//       hover: { mode: "index", intersect: false },
+//       animation: { duration: 800, easing: "easeOutQuart" },
+//       plugins: {
+//         legend: { display: false },
+//         tooltip: {
+//           ...baseTooltipStyle(),
+//           enabled: true,
+//           displayColors: false,
+//           caretSize: 7,
+//           caretPadding: 8,
+//           // callbacks: {
+//           //   title(items) {
+//           //     const idx = items[0].dataIndex;
+//           //     const monthIdx = monthIndices[idx] ?? FISCAL_MONTH_ORDER[idx] ?? (idx + 1);
+//           //     const yr = monthIdx >= 10 ? fiscalYear.value - 1 : fiscalYear.value;
+//           //     return `${THAI_MONTHS_FULL[monthIdx]} พ.ศ. ${yr + 543}`;
+//           //   },
+//           //   label(ctx) {
+//           //     return `มูลค่า: ${ctx.parsed.y.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บาท`;
+//           //   },
+//           //   afterLabel(ctx) {
+//           //     const dataset = ctx.dataset.data as number[];
+//           //     const dataTotal = dataset.reduce((a, b) => a + (Number(b) || 0), 0);
+//           //     const pct = dataTotal > 0 ? ((ctx.parsed.y / dataTotal) * 100).toFixed(1) : '0.0';
+//           //     return `สัดส่วน: ${pct}% ของทั้งปี`;
+//           //   },
+//           // },
+//           callbacks: {
+//             title(items) {
+//               const idx = items[0]?.dataIndex ?? 0;
+//               const monthIdx =
+//                 monthIndices[idx] ?? FISCAL_MONTH_ORDER[idx] ?? idx + 1;
+//               const yr =
+//                 monthIdx >= 10 ? fiscalYear.value - 1 : fiscalYear.value;
+//               return `${THAI_MONTHS_FULL[monthIdx]} พ.ศ. ${yr + 543}`;
+//             },
+//             label(ctx) {
+//               return `มูลค่า: ${(ctx.parsed.y ?? 0).toLocaleString("th-TH", { minimumFractionDigits: 0 })} บาท`;
+//             },
+//             afterLabel(ctx) {
+//               const dataset = ctx.dataset.data as number[];
+//               const dataTotal = dataset.reduce(
+//                 (a, b) => a + (Number(b) || 0),
+//                 0,
+//               );
+//               const pct =
+//                 dataTotal > 0
+//                   ? (((ctx.parsed.y ?? 0) / dataTotal) * 100).toFixed(1)
+//                   : "0.0";
+//               return `สัดส่วน: ${pct}% ของทั้งปี`;
+//             },
+//           },
+//         },
+//       },
+//       scales: {
+//         x: {
+//           grid: { display: false },
+//           border: { display: false },
+//           ticks: {
+//             color: TICK_COLOR,
+//             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
+//             maxRotation: mobile ? 45 : 0,
+//           },
+//         },
+//         y: {
+//           beginAtZero: true,
+//           grid: { color: GRID_COLOR, drawTicks: false },
+//           border: { display: false },
+//           ticks: {
+//             color: TICK_COLOR,
+//             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
+//             padding: 8,
+//             callback: (v) => formatAxisValue(Number(v)),
+//           },
+//         },
+//       },
+//     },
+//   });
+
+//   charts.set("monthly", chart);
+// }
 
 function renderDoughnut(
   key: string,
   canvas: HTMLCanvasElement | null,
   labels: string[],
   values: number[],
-  palette: readonly string[],
+  palette: readonly string[]
 ): void {
   destroyChart(key);
-  if (!canvas || !values.length || values.every((v) => v === 0)) return;
+  if (!canvas || !values.length || values.every(v => v === 0)) return;
 
   const mobile = isMobile();
   const total = values.reduce((a, b) => a + b, 0);
-  const colors = [...palette.slice(0, values.length)];
+  const colors = palette.slice(0, values.length);
 
   const chart = new Chart(canvas, {
     type: "doughnut",
@@ -949,13 +1070,13 @@ function renderDoughnut(
         {
           data: values,
           backgroundColor: colors,
-          hoverBackgroundColor: colors.map((c) => c + "DD"),
+          hoverBackgroundColor: colors.map(c => c + "DD"),
           borderWidth: 2,
           borderColor: "#fff",
           hoverBorderColor: "#fff",
-          hoverOffset: 6,
-        },
-      ],
+          hoverOffset: 6
+        }
+      ]
     },
     options: {
       responsive: true,
@@ -977,16 +1098,16 @@ function renderDoughnut(
           //   },
           // },
           callbacks: {
-  title: (items) => labels[items[0]?.dataIndex ?? 0],
-  label(ctx) {
-    const val = ctx.parsed ?? 0;
-    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
-    return ` ${val.toLocaleString('th-TH')} บาท (${pct}%)`;
-  },
-},
-        },
-      },
-    },
+            title: items => labels[items[0]?.dataIndex ?? 0],
+            label(ctx) {
+              const val = ctx.parsed ?? 0;
+              const pct = total > 0 ? ((val / total) * 100).toFixed(1) : "0.0";
+              return ` ${val.toLocaleString("th-TH")} บาท (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
   });
 
   charts.set(key, chart);
@@ -1009,6 +1130,10 @@ function handleResize(): void {
 
 onMounted(() => {
   window.addEventListener("resize", handleResize);
+  fetchAll();
+});
+// เพิ่มตรงนี้
+watch([fiscalYear, selectedMonth], () => {
   fetchAll();
 });
 
@@ -1498,10 +1623,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 7px;
 }
-.legend-inline__dot {
+/* .legend-inline__dot {
   width: 10px;
   height: 10px;
   border-radius: 4px;
+} */
+.legend-inline__line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
 }
 .legend-inline__text {
   font-size: 12px;
