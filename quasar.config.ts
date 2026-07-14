@@ -2,7 +2,9 @@
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
 import { defineConfig } from "#q-app";
+import dotenv from "dotenv";
 
+dotenv.config({ path: ".env.local" });
 export default defineConfig(_ctx => {
   return {
     // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
@@ -73,7 +75,9 @@ export default defineConfig(_ctx => {
       port: 9000,
       proxy: {
         "/api": {
-          target: "http://localhost:3000/dashboard-google-sheets/api/v1",
+          // target: "http://localhost:3000/dashboard-google-sheets/api/v1",
+          target: process.env.VITE_API_URL,
+          // target: "https://inventory-neon-one.vercel.app/dashboard-google-sheets/api/v1",
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, "")
         }

@@ -18,9 +18,19 @@
       </div>
 
       <div class="card-row">
-        <div v-for="card in summaryCards" :key="card.key" class="stat-card">
+        <div
+          v-for="(card, ci) in summaryCards"
+          :key="card.key"
+          class="stat-card"
+          :class="{ 'stat-card--counting': card.animating }"
+          :style="{ '--delay': ci * 0.12 + 's' }"
+        >
           <div class="stat-card__shine"></div>
-          <div class="stat-card__icon" :style="{ background: card.iconBg }">
+          <div
+            class="stat-card__icon"
+            :style="{ background: card.iconBg }"
+            :class="{ 'stat-card__icon--pulse': card.animating }"
+          >
             <q-icon
               :name="card.icon"
               size="24px"
@@ -30,8 +40,13 @@
           <div class="stat-card__body">
             <span class="stat-card__label">{{ card.label }}</span>
             <div class="stat-card__row">
-              <span class="stat-card__value" :style="{ color: card.color }">
-                {{ loading ? "—" : card.display }}
+              <span
+                class="stat-card__value"
+                :class="{ 'stat-card__value--counting': card.animating }"
+                :style="{ color: card.color }"
+              >
+                <template v-if="loading">—</template>
+                <template v-else>{{ card.display }}</template>
               </span>
               <span class="stat-card__unit">{{ card.unit }}</span>
             </div>
@@ -86,10 +101,11 @@
             class="filter-field month-field"
             popup-content-class="filter-popup"
           />
+
         </div>
       </div>
 
-      <!-- ═══ Monthly Bar Chart + Pie ═══ -->
+      <!-- ═══ Monthly Line Chart + Pie ═══ -->
       <div class="panel">
         <div class="panel__head">
           <div>
@@ -107,13 +123,11 @@
             </div>
           </div>
           <div class="legend-inline">
-            <!-- <span class="legend-inline__dot" style="background: #f2845c"></span> -->
-            <span
-              class="legend-inline__line"
-              style="background: #e86d3a"
-            ></span>
-            <span class="legend-inline__text">อัตราสำรองเวชภัณฑ์</span>
-          </div>
+  <span class="legend-inline__dot" style="background: #EF4444"></span>
+  <span class="legend-inline__text">≥ 60 บาท</span>
+  <span class="legend-inline__dot" style="background: #FACC15; margin-left: 12px"></span>
+  <span class="legend-inline__text">&lt; 60 บาท</span>
+</div>
         </div>
 
         <div class="chart-combo">
@@ -127,11 +141,19 @@
             <div class="panel__canvas panel__canvas--doughnut">
               <canvas ref="monthlyPieRef"></canvas>
             </div>
-            <div class="html-legend">
+            <div class="html-legend" :key="'ml-' + animKey">
               <div
                 v-for="(item, i) in monthlyPieLegend"
                 :key="i"
-                class="html-legend__row"
+                class="html-legend__row anim-fade-in"
+                :class="{
+                  'html-legend__row--active': highlightedPieIndex === i,
+                  'html-legend__row--dimmed':
+                    highlightedPieIndex != null && highlightedPieIndex !== i
+                }"
+                :style="{ '--delay': i * 0.04 + 's' }"
+                @mouseenter="highlightPieSegment('monthlyPie', i)"
+                @mouseleave="unhighlightPieSegment('monthlyPie')"
               >
                 <span
                   class="html-legend__dot"
@@ -145,7 +167,7 @@
         </div>
       </div>
 
-      <!-- ═══ Top 10 (data-driven — single template, two configs) ═══ -->
+      <!-- ═══ Top 10 (data-driven) ═══ -->
       <div class="twin-grid">
         <div v-for="cfg in topTenConfigs" :key="cfg.key" class="panel">
           <div class="panel__head">
@@ -165,25 +187,38 @@
           </div>
 
           <!-- HTML Bar Chart -->
-          <div class="hbar">
+          <div class="hbar" :key="'hbar-' + cfg.key + '-' + topTenAnimKey">
             <div
               v-for="(item, i) in cfg.items.value"
               :key="i"
-              class="hbar__row"
+              class="hbar__row anim-slide-up"
+              :class="{
+                'hbar__row--active': topTenHighlight[cfg.key] === i,
+                'hbar__row--dimmed':
+                  topTenHighlight[cfg.key] != null &&
+                  topTenHighlight[cfg.key] !== i
+              }"
+              :style="{ '--delay': i * 0.06 + 's' }"
+              @mouseenter="onBarHover(cfg.key, i)"
+              @mouseleave="onBarLeave(cfg.key)"
+              @click="onBarClick(cfg.key, i)"
             >
-              <div class="hbar__label">{{ item.name }}</div>
-              <div class="hbar__track">
-                <div
-                  :class="['hbar__fill', cfg.fillClass]"
-                  :style="{ width: item.pct + '%' }"
-                >
-                  <span v-if="item.pct > 25" class="hbar__val-inside">{{
+              <div class="hbar__rank">#{{ i + 1 }}</div>
+              <div class="hbar__info">
+                <div class="hbar__label">{{ item.name }}</div>
+                <div class="hbar__track">
+                  <div
+                    :class="['hbar__fill', cfg.fillClass, 'anim-bar-grow']"
+                    :style="{ width: item.pct + '%', '--delay': i * 0.06 + 0.15 + 's' }"
+                  >
+                    <span v-if="item.pct > 25" class="hbar__val-inside">{{
+                      fmtShort(item.value)
+                    }}</span>
+                  </div>
+                  <span v-if="item.pct <= 25" class="hbar__val-outside">{{
                     fmtShort(item.value)
                   }}</span>
                 </div>
-                <span v-if="item.pct <= 25" class="hbar__val-outside">{{
-                  fmtShort(item.value)
-                }}</span>
               </div>
               <q-tooltip
                 class="hbar-tooltip"
@@ -217,11 +252,21 @@
                 "
               ></canvas>
             </div>
-            <div class="html-legend">
+            <div class="html-legend" :key="'lg-' + cfg.key + '-' + topTenAnimKey">
               <div
                 v-for="(item, i) in cfg.legend.value"
                 :key="i"
-                class="html-legend__row"
+                class="html-legend__row anim-fade-in"
+                :class="{
+                  'html-legend__row--active': topTenHighlight[cfg.key] === i,
+                  'html-legend__row--dimmed':
+                    topTenHighlight[cfg.key] != null &&
+                    topTenHighlight[cfg.key] !== i
+                }"
+                :style="{ '--delay': i * 0.04 + 's' }"
+                @mouseenter="onBarHover(cfg.key, i)"
+                @mouseleave="onBarLeave(cfg.key)"
+                @click="onBarClick(cfg.key, i)"
               >
                 <span
                   class="html-legend__dot"
@@ -250,6 +295,7 @@ import {
   onUnmounted,
   nextTick,
   watch,
+  reactive,
   type Ref
 } from "vue";
 import { api } from "@/boot/axios";
@@ -432,6 +478,25 @@ const TICK_COLOR = "rgba(0,0,0,0.5)";
 const TOOLTIP_BG = "rgba(27,37,89,0.95)";
 const START_YEAR = 2020;
 
+/* ── Threshold-based coloring ── */
+const STOCK_THRESHOLD = 60;
+
+const COLOR = {
+  good:     "#EF4444",                        // แดง (≥ 60)
+  goodFill: "rgba(239, 68, 68, 0.18)",
+  goodPie:  "#EF4444",
+  warn:     "#FACC15",                        // เหลือง (< 60)
+  warnFill: "rgba(250, 204, 21, 0.18)",
+  warnPie:  "#FACC15"
+} as const;
+
+/** Return color pair for a single value */
+function thresholdColor(val: number) {
+  return val < STOCK_THRESHOLD
+    ? { line: COLOR.warn, fill: COLOR.warnFill, pie: COLOR.warnPie }
+    : { line: COLOR.good, fill: COLOR.goodFill, pie: COLOR.goodPie };
+}
+
 /* ════════════════════════════════════════════════
    Formatting helpers
    ════════════════════════════════════════════════ */
@@ -467,12 +532,6 @@ function buildLegendItems(
   palette: readonly string[]
 ): LegendItem[] {
   const total = values.reduce((a, b) => a + b, 0);
-  // return labels.map((label, i) => ({
-  //   label,
-  //   color: palette[i % palette.length],
-  //   pct: total > 0 ? ((values[i] / total) * 100).toFixed(1) : '0.0',
-  //   value: values[i],
-  // }));
   return labels.map((label, i) => ({
     label,
     color: palette[i % palette.length] ?? "#999999",
@@ -484,13 +543,6 @@ function buildLegendItems(
 function toBarItems(names: string[], values: number[]): BarItem[] {
   const max = Math.max(...values, 1);
   const total = values.reduce((a, b) => a + b, 0);
-  // return names.map((name, i) => ({
-  //   name,
-  //   value: values[i],
-  //   pct: (values[i] / max) * 100,
-  //   sharePct: total > 0 ? (values[i] / total) * 100 : 0,
-  // }));
-  // After
   return names.map((name, i) => ({
     name,
     value: values[i] ?? 0,
@@ -518,6 +570,11 @@ const totalSKU = ref(0);
 const stockValue = ref(0);
 const lastUpdated = ref("");
 
+/** Incremented every fetch — used as :key to re-mount animated elements */
+const animKey = ref(0);
+/** Separate key for Top 10 only (month change) */
+const topTenAnimKey = ref(0);
+
 const now = new Date();
 const currentMonth = now.getMonth() + 1;
 const currentFiscalYear =
@@ -528,6 +585,78 @@ const selectedMonth = ref<number | null>(null);
 
 const buddhistFiscalYear = computed(() => fiscalYear.value + 543);
 
+// Interactive state: which pie/bar index is highlighted
+const highlightedPieIndex = ref<number | null>(null);
+const topTenHighlight = reactive<Record<string, number | null>>({
+  stock: null,
+  transout: null
+});
+
+/* ════════════════════════════════════════════════
+   Animated count-up
+   ════════════════════════════════════════════════ */
+
+function useCountUp(
+  source: Ref<number>,
+  opts: { duration?: number; decimals?: number } = {}
+) {
+  const { duration = 1200, decimals = 0 } = opts;
+  const display = ref(0);
+  const isAnimating = ref(false);
+  let raf = 0;
+
+  function easeOutExpo(t: number): number {
+    return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+
+  watch(
+    source,
+    (to, from) => {
+      const start = from ?? 0;
+      const delta = to - start;
+      if (delta === 0) {
+        display.value = to;
+        return;
+      }
+
+      cancelAnimationFrame(raf);
+      isAnimating.value = true;
+      const t0 = performance.now();
+
+      function tick(now: number) {
+        const elapsed = now - t0;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeOutExpo(progress);
+        display.value = parseFloat((start + delta * eased).toFixed(decimals));
+
+        if (progress < 1) {
+          raf = requestAnimationFrame(tick);
+        } else {
+          display.value = to;
+          isAnimating.value = false;
+        }
+      }
+
+      raf = requestAnimationFrame(tick);
+    },
+    { immediate: true }
+  );
+
+  onUnmounted(() => cancelAnimationFrame(raf));
+
+  const formatted = computed(() =>
+    display.value.toLocaleString("th-TH", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    })
+  );
+
+  return { display, formatted, isAnimating };
+}
+
+const animSKU = useCountUp(totalSKU, { duration: 1400 });
+const animStock = useCountUp(stockValue, { duration: 1800 });
+
 // Top 10 data
 const topStockItems = ref<BarItem[]>([]);
 const topTransOutItems = ref<BarItem[]>([]);
@@ -536,7 +665,6 @@ const topTransOutItems = ref<BarItem[]>([]);
 const monthlyChartRef = ref<HTMLCanvasElement | null>(null);
 const monthlyPieRef = ref<HTMLCanvasElement | null>(null);
 
-// Dynamic canvas refs for top-ten pie charts (set via template :ref callback)
 const topTenCanvasRefs = new Map<string, HTMLCanvasElement | null>();
 
 function setTopTenCanvas(key: string, el: HTMLCanvasElement | null): void {
@@ -549,7 +677,7 @@ const topStockPieLegend = ref<LegendItem[]>([]);
 const topTransOutPieLegend = ref<LegendItem[]>([]);
 
 /* ════════════════════════════════════════════════
-   Chart instance registry (centralised lifecycle)
+   Chart instance registry
    ════════════════════════════════════════════════ */
 
 const charts = new Map<string, Chart>();
@@ -569,6 +697,57 @@ function resizeAllCharts(): void {
 }
 
 /* ════════════════════════════════════════════════
+   Interactive: Cross-chart highlighting
+   ════════════════════════════════════════════════ */
+
+function highlightPieSegment(chartKey: string, index: number): void {
+  highlightedPieIndex.value = index;
+  const chart = charts.get(chartKey);
+  if (!chart) return;
+  chart.setActiveElements([{ datasetIndex: 0, index }]);
+  chart.tooltip?.setActiveElements([{ datasetIndex: 0, index }], { x: 0, y: 0 });
+  chart.update("none");
+}
+
+function unhighlightPieSegment(chartKey: string): void {
+  highlightedPieIndex.value = null;
+  const chart = charts.get(chartKey);
+  if (!chart) return;
+  chart.setActiveElements([]);
+  chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+  chart.update("none");
+}
+
+/** Hover on bar row → highlight corresponding pie segment */
+function onBarHover(cfgKey: string, index: number): void {
+  topTenHighlight[cfgKey] = index;
+  const chart = charts.get(cfgKey);
+  if (!chart) return;
+  chart.setActiveElements([{ datasetIndex: 0, index }]);
+  chart.tooltip?.setActiveElements([{ datasetIndex: 0, index }], { x: 0, y: 0 });
+  chart.update("none");
+}
+
+function onBarLeave(cfgKey: string): void {
+  topTenHighlight[cfgKey] = null;
+  const chart = charts.get(cfgKey);
+  if (!chart) return;
+  chart.setActiveElements([]);
+  chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+  chart.update("none");
+}
+
+/** Click on bar row → toggle persistent highlight */
+function onBarClick(cfgKey: string, index: number): void {
+  // Toggle: if already selected, clear
+  if (topTenHighlight[cfgKey] === index) {
+    topTenHighlight[cfgKey] = null;
+  } else {
+    topTenHighlight[cfgKey] = index;
+  }
+}
+
+/* ════════════════════════════════════════════════
    Summary cards
    ════════════════════════════════════════════════ */
 
@@ -577,19 +756,21 @@ const summaryCards = computed(() => [
     key: "sku",
     icon: "category",
     label: "จำนวน SKU ทั้งหมด",
-    display: (totalSKU.value ?? 0).toLocaleString(),
+    display: animSKU.formatted.value,
     unit: "รายการ",
     color: "#4361EE",
-    iconBg: "rgba(67,97,238,0.12)"
+    iconBg: "rgba(67,97,238,0.12)",
+    animating: animSKU.isAnimating.value
   },
   {
     key: "value",
     icon: "account_balance_wallet",
     label: "มูลค่าคงคลังรวม",
-    display: formatCurrency(stockValue.value),
+    display: animStock.formatted.value,
     unit: "บาท",
     color: "#7B2FF7",
-    iconBg: "rgba(123,47,247,0.12)"
+    iconBg: "rgba(123,47,247,0.12)",
+    animating: animStock.isAnimating.value
   }
 ]);
 
@@ -628,24 +809,12 @@ const topTenConfigs: TopTenPanelConfig[] = [
   }
 ];
 
-// function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
-//   if (!cfg.useMonth) return `ทุกเดือน · ปีงบ ${buddhistFiscalYear.value}`;
-//   const month = selectedMonth.value ? THAI_MONTHS_FULL[selectedMonth.value] : THAI_MONTHS_FULL[currentMonth];
-//   return `${month} · ปีงบ ${buddhistFiscalYear.value}`;
-// }
 function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
   if (selectedMonth.value) {
     return `${THAI_MONTHS_FULL[selectedMonth.value]} · ปีงบ ${buddhistFiscalYear.value}`;
   }
   return `ทุกเดือน · ปีงบ ${buddhistFiscalYear.value}`;
 }
-// function getTopTenSubLabel(cfg: TopTenPanelConfig): string {
-//   if (selectedMonth.value) {
-//     return `${THAI_MONTHS_FULL[selectedMonth.value]} · ปีงบ ${buddhistFiscalYear.value}`;
-//   }
-//   const fallback = cfg.useMonth ? THAI_MONTHS_FULL[currentMonth] : "ทุกเดือน";
-//   return `${fallback} · ปีงบ ${buddhistFiscalYear.value}`;
-// }
 
 /* ════════════════════════════════════════════════
    Fiscal year options
@@ -691,8 +860,21 @@ async function fetchAll(): Promise<void> {
       ...topTenConfigs.map(fetchTopTen)
     ]);
     updateTimestamp();
+    animKey.value++;
+    topTenAnimKey.value++;
   } finally {
     loading.value = false;
+  }
+}
+
+/** Only re-fetch Top 10 panels (month filter changed, no need to redraw line chart) */
+async function fetchTopTenOnly(): Promise<void> {
+  try {
+    await Promise.all(topTenConfigs.map(fetchTopTen));
+    updateTimestamp();
+    topTenAnimKey.value++;
+  } catch (e) {
+    console.error("[Dashboard] fetchTopTenOnly:", e);
   }
 }
 
@@ -726,7 +908,6 @@ async function fetchMonthlyStockValue(): Promise<void> {
     );
 
     const months = data?.months ?? [];
-    // const labels = months.map((m) => THAI_MONTHS_SHORT[m.month]);
     const labels = months.map(
       m => THAI_MONTHS_SHORT[m.month] ?? String(m.month)
     );
@@ -735,25 +916,26 @@ async function fetchMonthlyStockValue(): Promise<void> {
 
     await nextTick();
 
-    renderMonthlyBarChart(labels, values, monthIndices);
-    monthlyPieLegend.value = buildLegendItems(labels, values, PALETTE.orange);
+    // Build threshold-based color arrays for monthly charts
+    const thresholdPalette = values.map(v => thresholdColor(v).pie);
+
+    renderMonthlyLineChart(labels, values, monthIndices);
+    monthlyPieLegend.value = buildLegendItems(labels, values, thresholdPalette);
     renderDoughnut(
       "monthlyPie",
       monthlyPieRef.value,
       labels,
       values,
-      PALETTE.orange
+      thresholdPalette
     );
   } catch (e) {
     console.error("[Dashboard] fetchMonthlyStockValue:", e);
   }
 }
 
-/** Unified fetcher — driven by TopTenPanelConfig */
 async function fetchTopTen(cfg: TopTenPanelConfig): Promise<void> {
   try {
     const params: Record<string, number> = { financialYear: fiscalYear.value };
-    // if (cfg.useMonth && selectedMonth.value != null) params.month = selectedMonth.value;
     if (selectedMonth.value != null) params.month = selectedMonth.value;
 
     const { data } = await api.get<TopTenRecord[]>(cfg.endpoint, { params });
@@ -774,6 +956,180 @@ async function fetchTopTen(cfg: TopTenPanelConfig): Promise<void> {
 }
 
 /* ════════════════════════════════════════════════
+   Chart.js — Line-reveal + Crosshair plugin
+   ════════════════════════════════════════════════ */
+
+/**
+ * Progressive clip-reveal: the line + fill "draw" from left to right,
+ * then points pop in one by one.  After the reveal the clip is removed
+ * so hover / tooltip work normally.
+ */
+const lineRevealPlugin = {
+  id: "lineReveal",
+
+  beforeDraw(chart: Chart) {
+    const meta = (chart as any).__reveal;
+    if (!meta || meta.progress >= 1) return;
+
+    const { ctx, chartArea } = chart;
+    const w = chartArea.right - chartArea.left;
+    const revealX = chartArea.left + w * meta.progress;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, 0, revealX - chartArea.left, chart.height);
+    ctx.clip();
+  },
+
+  afterDraw(chart: Chart) {
+    const meta = (chart as any).__reveal;
+    if (!meta || meta.progress >= 1) return;
+    chart.ctx.restore();
+  },
+
+  afterRender(chart: Chart) {
+    // also draw crosshair for active element
+    const active = chart.getActiveElements();
+    if (!active.length) return;
+    const { ctx, chartArea } = chart;
+    const x = active[0]!.element.x;
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "rgba(100, 116, 139, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+/** Kick off the reveal animation after chart is created */
+function startLineReveal(chart: Chart, duration = 1600): void {
+  const meta = { progress: 0 };
+  (chart as any).__reveal = meta;
+
+  const t0 = performance.now();
+
+  function easeOutCubic(t: number) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function tick(now: number) {
+    const elapsed = now - t0;
+    const raw = Math.min(elapsed / duration, 1);
+    meta.progress = easeOutCubic(raw);
+    chart.draw();
+
+    if (raw < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      meta.progress = 1;
+      chart.draw();
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
+/**
+ * Doughnut circular-sweep reveal: segments sweep clockwise from 12 o'clock.
+ * Uses a wedge-shaped clip that grows from 0° → 360°.
+ */
+const doughnutRevealPlugin = {
+  id: "doughnutReveal",
+
+  beforeDraw(chart: Chart) {
+    const meta = (chart as any).__doughnutReveal;
+    if (!meta || meta.progress >= 1) return;
+
+    const { ctx, chartArea } = chart;
+    const cx = (chartArea.left + chartArea.right) / 2;
+    const cy = (chartArea.top + chartArea.bottom) / 2;
+    // Radius large enough to cover the entire chart
+    const r = Math.max(chart.width, chart.height);
+
+    const startAngle = -Math.PI / 2; // 12 o'clock
+    const endAngle = startAngle + Math.PI * 2 * meta.progress;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.clip();
+  },
+
+  afterDraw(chart: Chart) {
+    const meta = (chart as any).__doughnutReveal;
+    if (!meta || meta.progress >= 1) return;
+    chart.ctx.restore();
+  }
+};
+
+/** Kick off the doughnut sweep animation */
+function startDoughnutReveal(chart: Chart, duration = 1200): void {
+  const meta = { progress: 0 };
+  (chart as any).__doughnutReveal = meta;
+
+  const t0 = performance.now();
+
+  function easeOutQuart(t: number) {
+    return 1 - Math.pow(1 - t, 4);
+  }
+
+  function tick(now: number) {
+    const elapsed = now - t0;
+    const raw = Math.min(elapsed / duration, 1);
+    meta.progress = easeOutQuart(raw);
+    chart.draw();
+
+    if (raw < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      meta.progress = 1;
+      chart.draw();
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
+/* ════════════════════════════════════════════════
+   Chart.js — Threshold line plugin
+   ════════════════════════════════════════════════ */
+
+const thresholdLinePlugin = {
+  id: "thresholdLine",
+  afterDraw(chart: Chart) {
+    const yScale = chart.scales["y"];
+    if (!yScale) return;
+
+    const yPixel = yScale.getPixelForValue(STOCK_THRESHOLD);
+    if (yPixel < chart.chartArea.top || yPixel > chart.chartArea.bottom) return;
+
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "rgba(239, 68, 68, 0.45)";
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(chartArea.left, yPixel);
+    ctx.lineTo(chartArea.right, yPixel);
+    ctx.stroke();
+
+    // Label
+    ctx.setLineDash([]);
+    ctx.font = `600 11px ${CHART_FONT.family}`;
+    ctx.fillStyle = "rgba(239, 68, 68, 0.7)";
+    ctx.textAlign = "right";
+    ctx.fillText(`เกณฑ์ ${STOCK_THRESHOLD} บาท`, chartArea.right - 4, yPixel - 5);
+    ctx.restore();
+  }
+};
+
+/* ════════════════════════════════════════════════
    Chart rendering
    ════════════════════════════════════════════════ */
 
@@ -790,26 +1146,7 @@ function baseTooltipStyle(): Record<string, unknown> {
   };
 }
 
-type BarState = "normal" | "hovered";
-
-const BAR_GRADIENT_STOPS: Record<BarState, [string, string]> = {
-  hovered: ["rgba(220,80,60,0.85)", "rgba(200,55,35,1)"],
-  normal: ["rgba(251,176,144,0.75)", "rgba(232,109,58,1.0)"]
-};
-
-function makeBarGradient(
-  ctx2d: CanvasRenderingContext2D,
-  bottom: number,
-  top: number,
-  state: BarState
-): CanvasGradient {
-  const g = ctx2d.createLinearGradient(0, bottom, 0, top);
-  const [s0, s1] = BAR_GRADIENT_STOPS[state];
-  g.addColorStop(0, s0);
-  g.addColorStop(1, s1);
-  return g;
-}
-function renderMonthlyBarChart(
+function renderMonthlyLineChart(
   labels: string[],
   values: number[],
   monthIndices: number[]
@@ -818,13 +1155,10 @@ function renderMonthlyBarChart(
   if (!monthlyChartRef.value) return;
 
   const mobile = isMobile();
-  const ctx2d = monthlyChartRef.value.getContext("2d")!;
 
-  // Gradient fill ใต้เส้น
-  const gradientFill = ctx2d.createLinearGradient(0, 0, 0, 400);
-  gradientFill.addColorStop(0, "rgba(232, 109, 58, 0.35)");
-  gradientFill.addColorStop(0.6, "rgba(232, 109, 58, 0.08)");
-  gradientFill.addColorStop(1, "rgba(232, 109, 58, 0)");
+  // Per-point colors based on threshold
+  const pointBorderColors = values.map(v => thresholdColor(v).line);
+  const pointHoverBgColors = values.map(v => thresholdColor(v).line);
 
   const chart = new Chart(monthlyChartRef.value, {
     type: "line",
@@ -834,19 +1168,30 @@ function renderMonthlyBarChart(
         {
           label: "อัตราสำรองเวชภัณฑ์",
           data: values,
-          borderColor: "#E86D3A",
+          // Segment-level coloring: line + fill change per segment
+          segment: {
+            borderColor: (ctx: any) => {
+              const v = ctx.p1.parsed.y;
+              return thresholdColor(v).line;
+            },
+            backgroundColor: (ctx: any) => {
+              const v = ctx.p1.parsed.y;
+              return thresholdColor(v).fill;
+            }
+          },
+          borderColor: COLOR.good,  // fallback
           borderWidth: 3,
-          backgroundColor: gradientFill,
+          backgroundColor: COLOR.goodFill,  // fallback
           fill: true,
           tension: 0.4,
           pointBackgroundColor: "#fff",
-          pointBorderColor: "#E86D3A",
+          pointBorderColor: pointBorderColors,
           pointBorderWidth: 2.5,
           pointRadius: mobile ? 4 : 6,
-          pointHoverRadius: mobile ? 6 : 9,
-          pointHoverBackgroundColor: "#E86D3A",
+          pointHoverRadius: mobile ? 8 : 11,
+          pointHoverBackgroundColor: pointHoverBgColors,
           pointHoverBorderColor: "#fff",
-          pointHoverBorderWidth: 3
+          pointHoverBorderWidth: 3.5
         }
       ]
     },
@@ -855,7 +1200,8 @@ function renderMonthlyBarChart(
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       hover: { mode: "index", intersect: false },
-      animation: { duration: 800, easing: "easeOutQuart" },
+      // Disable default animation — the reveal plugin handles it
+      animation: false as any,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -886,7 +1232,11 @@ function renderMonthlyBarChart(
                 dataTotal > 0
                   ? (((ctx.parsed.y ?? 0) / dataTotal) * 100).toFixed(1)
                   : "0.0";
-              return `สัดส่วน: ${pct}% ของทั้งปี`;
+              const val = ctx.parsed.y ?? 0;
+              const status = val < STOCK_THRESHOLD
+              ? `🟡 ต่ำกว่าเกณฑ์ (< ${STOCK_THRESHOLD} บาท)`
+    : `🔴 สูงกว่าเกณฑ์ (≥ ${STOCK_THRESHOLD} บาท)`;
+              return `สัดส่วน: ${pct}% ของทั้งปี\n${status}`;
             }
           }
         }
@@ -913,140 +1263,15 @@ function renderMonthlyBarChart(
           }
         }
       }
-    }
+    },
+    plugins: [lineRevealPlugin, thresholdLinePlugin]
   });
 
   charts.set("monthly", chart);
+
+  // Start the flowing draw animation
+  startLineReveal(chart, mobile ? 1200 : 1600);
 }
-// function renderMonthlyBarChart(
-//   labels: string[],
-//   values: number[],
-//   monthIndices: number[],
-// ): void {
-//   destroyChart("monthly");
-//   if (!monthlyChartRef.value) return;
-
-//   const mobile = isMobile();
-
-//   const chart = new Chart(monthlyChartRef.value, {
-//     type: "bar",
-//     data: {
-//       labels,
-//       datasets: [
-//         {
-//           label: "อัตราสำรองเวชภัณฑ์",
-//           data: values,
-//           backgroundColor(ctx) {
-//             const chartInstance = ctx.chart;
-//             const { ctx: canvasCtx, chartArea } = chartInstance;
-//             if (!chartArea) return "rgba(232,109,58,0.8)";
-
-//             const active = chartInstance.getActiveElements();
-//             // const isHovered = active.length > 0 && active[0].index === ctx.dataIndex;
-//             const isHovered =
-//               active.length > 0 && active[0]?.index === ctx.dataIndex;
-//             const state: BarState = isHovered ? "hovered" : "normal";
-
-//             return makeBarGradient(
-//               canvasCtx,
-//               chartArea.bottom,
-//               chartArea.top,
-//               state,
-//             );
-//           },
-//           borderWidth: 0,
-//           borderRadius: mobile ? 4 : 8,
-//           borderSkipped: false,
-//           barPercentage: 0.55,
-//           categoryPercentage: 0.65,
-//         },
-//       ],
-//     },
-//     options: {
-//       responsive: true,
-//       maintainAspectRatio: false,
-//       interaction: { mode: "index", intersect: false },
-//       hover: { mode: "index", intersect: false },
-//       animation: { duration: 800, easing: "easeOutQuart" },
-//       plugins: {
-//         legend: { display: false },
-//         tooltip: {
-//           ...baseTooltipStyle(),
-//           enabled: true,
-//           displayColors: false,
-//           caretSize: 7,
-//           caretPadding: 8,
-//           // callbacks: {
-//           //   title(items) {
-//           //     const idx = items[0].dataIndex;
-//           //     const monthIdx = monthIndices[idx] ?? FISCAL_MONTH_ORDER[idx] ?? (idx + 1);
-//           //     const yr = monthIdx >= 10 ? fiscalYear.value - 1 : fiscalYear.value;
-//           //     return `${THAI_MONTHS_FULL[monthIdx]} พ.ศ. ${yr + 543}`;
-//           //   },
-//           //   label(ctx) {
-//           //     return `มูลค่า: ${ctx.parsed.y.toLocaleString('th-TH', { minimumFractionDigits: 0 })} บาท`;
-//           //   },
-//           //   afterLabel(ctx) {
-//           //     const dataset = ctx.dataset.data as number[];
-//           //     const dataTotal = dataset.reduce((a, b) => a + (Number(b) || 0), 0);
-//           //     const pct = dataTotal > 0 ? ((ctx.parsed.y / dataTotal) * 100).toFixed(1) : '0.0';
-//           //     return `สัดส่วน: ${pct}% ของทั้งปี`;
-//           //   },
-//           // },
-//           callbacks: {
-//             title(items) {
-//               const idx = items[0]?.dataIndex ?? 0;
-//               const monthIdx =
-//                 monthIndices[idx] ?? FISCAL_MONTH_ORDER[idx] ?? idx + 1;
-//               const yr =
-//                 monthIdx >= 10 ? fiscalYear.value - 1 : fiscalYear.value;
-//               return `${THAI_MONTHS_FULL[monthIdx]} พ.ศ. ${yr + 543}`;
-//             },
-//             label(ctx) {
-//               return `มูลค่า: ${(ctx.parsed.y ?? 0).toLocaleString("th-TH", { minimumFractionDigits: 0 })} บาท`;
-//             },
-//             afterLabel(ctx) {
-//               const dataset = ctx.dataset.data as number[];
-//               const dataTotal = dataset.reduce(
-//                 (a, b) => a + (Number(b) || 0),
-//                 0,
-//               );
-//               const pct =
-//                 dataTotal > 0
-//                   ? (((ctx.parsed.y ?? 0) / dataTotal) * 100).toFixed(1)
-//                   : "0.0";
-//               return `สัดส่วน: ${pct}% ของทั้งปี`;
-//             },
-//           },
-//         },
-//       },
-//       scales: {
-//         x: {
-//           grid: { display: false },
-//           border: { display: false },
-//           ticks: {
-//             color: TICK_COLOR,
-//             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
-//             maxRotation: mobile ? 45 : 0,
-//           },
-//         },
-//         y: {
-//           beginAtZero: true,
-//           grid: { color: GRID_COLOR, drawTicks: false },
-//           border: { display: false },
-//           ticks: {
-//             color: TICK_COLOR,
-//             font: { ...CHART_FONT, size: mobile ? 10 : 12 },
-//             padding: 8,
-//             callback: (v) => formatAxisValue(Number(v)),
-//           },
-//         },
-//       },
-//     },
-//   });
-
-//   charts.set("monthly", chart);
-// }
 
 function renderDoughnut(
   key: string,
@@ -1062,7 +1287,7 @@ function renderDoughnut(
   const total = values.reduce((a, b) => a + b, 0);
   const colors = palette.slice(0, values.length);
 
-  const chart = new Chart(canvas, {
+  const chart = new Chart<"doughnut">(canvas, {
     type: "doughnut",
     data: {
       labels: [...labels],
@@ -1074,7 +1299,7 @@ function renderDoughnut(
           borderWidth: 2,
           borderColor: "#fff",
           hoverBorderColor: "#fff",
-          hoverOffset: 6
+          hoverOffset: 10
         }
       ]
     },
@@ -1082,21 +1307,25 @@ function renderDoughnut(
       responsive: true,
       maintainAspectRatio: false,
       cutout: "52%",
-      animation: { duration: 900, easing: "easeOutQuart" },
+      // Disable default animation — the sweep plugin handles it
+      animation: false as any,
       layout: { padding: mobile ? 4 : 12 },
+      onHover(event, elements, chart) {
+        // Sync legend highlight for top-ten pies
+        if (key === "stock" || key === "transout") {
+          topTenHighlight[key] = elements.length ? elements[0]!.index : null;
+        }
+        if (key === "monthlyPie") {
+          highlightedPieIndex.value = elements.length
+            ? elements[0]!.index
+            : null;
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
           ...baseTooltipStyle(),
           displayColors: true,
-          // callbacks: {
-          //   title: (items) => labels[items[0].dataIndex],
-          //   label(ctx) {
-          //     const val = ctx.parsed;
-          //     const pct = total > 0 ? ((val / total) * 100).toFixed(1) : "0.0";
-          //     return ` ${val.toLocaleString("th-TH")} บาท (${pct}%)`;
-          //   },
-          // },
           callbacks: {
             title: items => labels[items[0]?.dataIndex ?? 0],
             label(ctx) {
@@ -1107,10 +1336,15 @@ function renderDoughnut(
           }
         }
       }
-    }
+    },
+    plugins: [doughnutRevealPlugin]
   });
 
   charts.set(key, chart);
+
+  // Start the circular sweep animation
+  const duration = key === "monthlyPie" ? (mobile ? 1000 : 1400) : (mobile ? 800 : 1100);
+  startDoughnutReveal(chart, duration);
 }
 
 /* ════════════════════════════════════════════════
@@ -1132,9 +1366,15 @@ onMounted(() => {
   window.addEventListener("resize", handleResize);
   fetchAll();
 });
-// เพิ่มตรงนี้
-watch([fiscalYear, selectedMonth], () => {
+
+// ── fiscalYear changed → re-fetch everything (monthly chart + top 10)
+watch(fiscalYear, () => {
   fetchAll();
+});
+
+// ── selectedMonth changed → re-fetch only Top 10 (line chart stays intact)
+watch(selectedMonth, () => {
+  fetchTopTenOnly();
 });
 
 onUnmounted(() => {
@@ -1164,6 +1404,92 @@ onUnmounted(() => {
   min-height: 100vh;
   font-family: "Sarabun", "Inter", sans-serif;
   padding-bottom: 16px;
+}
+
+/* ═══ Transitions ═══ */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* ═══ Re-usable entry animations ═══ */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardPop {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  60% {
+    transform: translateY(-3px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.anim-slide-up {
+  animation: fadeSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+.anim-bar-grow {
+  transform-origin: left center;
+  animation: barGrow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+.anim-fade-in {
+  animation: fadeIn 0.4s ease both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* Stat cards entrance */
+.stat-card {
+  animation: cardPop 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-slide-up,
+  .anim-bar-grow,
+  .anim-fade-in,
+  .stat-card {
+    animation: none !important;
+  }
 }
 
 /* ═══ HERO ═══ */
@@ -1358,6 +1684,30 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+/* ═══ Count-up animation states ═══ */
+.stat-card--counting {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.stat-card__value--counting {
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card__icon--pulse {
+  animation: icon-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes icon-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
 /* ═══ CONTENT ═══ */
 .content-area {
   max-width: 1280px;
@@ -1413,13 +1763,6 @@ onUnmounted(() => {
 .month-field {
   width: 160px;
   max-width: 100%;
-}
-
-.filter-search-btn {
-  border-radius: 12px !important;
-  padding: 8px 24px;
-  font-weight: 700;
-  min-height: 40px;
 }
 
 /* ═══ PANEL ═══ */
@@ -1503,35 +1846,63 @@ onUnmounted(() => {
 
 .hbar__row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
   position: relative;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
   margin: -4px -6px;
   transition:
-    opacity 0.25s ease,
-    background 0.25s ease;
+    opacity 0.3s ease,
+    background 0.3s ease,
+    transform 0.2s ease;
 }
 
-.hbar:hover .hbar__row:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.02);
+.hbar__row--active {
+  background: rgba(0, 0, 0, 0.035);
+  transform: scale(1.01);
 }
-.hbar:hover .hbar__row:hover .hbar__fill--teal {
+
+.hbar__row--dimmed {
+  opacity: 0.35;
+}
+
+.hbar:hover .hbar__row:not(.hbar__row--dimmed):hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.hbar:hover .hbar__row:not(.hbar__row--dimmed):hover .hbar__fill--teal {
   background: linear-gradient(
     90deg,
     rgba(14, 165, 160, 0.75),
     rgba(13, 148, 136, 1)
   );
 }
-.hbar:hover .hbar__row:hover .hbar__fill--coral {
+.hbar:hover .hbar__row:not(.hbar__row--dimmed):hover .hbar__fill--coral {
   background: linear-gradient(
     90deg,
     rgba(232, 109, 58, 0.75),
     rgba(220, 80, 50, 1)
   );
+}
+
+.hbar__rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  min-width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.hbar__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .hbar__label {
@@ -1561,9 +1932,7 @@ onUnmounted(() => {
   justify-content: flex-end;
   padding: 0 10px;
   min-width: 4px;
-  transition:
-    width 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.2s;
+  transition: filter 0.2s;
 }
 
 .hbar__fill--teal {
@@ -1623,11 +1992,12 @@ onUnmounted(() => {
   align-items: center;
   gap: 7px;
 }
-/* .legend-inline__dot {
+.legend-inline__dot {
   width: 10px;
   height: 10px;
-  border-radius: 4px;
-} */
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 .legend-inline__line {
   width: 20px;
   height: 3px;
@@ -1649,8 +2019,27 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 0;
+  padding: 5px 6px;
   min-width: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    opacity 0.3s ease,
+    transform 0.2s ease;
+}
+
+.html-legend__row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.html-legend__row--active {
+  background: rgba(0, 0, 0, 0.04);
+  transform: scale(1.02);
+}
+
+.html-legend__row--dimmed {
+  opacity: 0.3;
 }
 
 .html-legend__dot {
@@ -1658,6 +2047,12 @@ onUnmounted(() => {
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.html-legend__row:hover .html-legend__dot,
+.html-legend__row--active .html-legend__dot {
+  transform: scale(1.3);
 }
 
 .html-legend__name {
@@ -1846,10 +2241,6 @@ onUnmounted(() => {
   .month-field {
     width: 100% !important;
   }
-  .filter-search-btn {
-    width: 100%;
-    justify-content: center;
-  }
   .panel {
     padding: 14px;
     margin-bottom: 14px;
@@ -1924,6 +2315,10 @@ onUnmounted(() => {
   .hbar__val-outside {
     font-size: 10px;
   }
+  .hbar__rank {
+    font-size: 10px;
+    min-width: 20px;
+  }
 }
 
 @media (max-width: 380px) {
@@ -1969,16 +2364,13 @@ onUnmounted(() => {
   .stat-card__shine {
     display: none;
   }
-  .filter-search-btn {
-    min-height: 44px;
-  }
   .filter-field :deep(.q-field__control) {
     min-height: 44px;
   }
 }
 </style>
 
-<!-- Global tooltip style (unscoped — q-tooltip renders outside component root) -->
+<!-- Global tooltip style (unscoped) -->
 <style>
 .hbar-tooltip {
   background: rgba(27, 37, 89, 0.95) !important;
